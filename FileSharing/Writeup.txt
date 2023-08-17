@@ -1,8 +1,6 @@
-# BachelorProjekt
-
 Peer to Peer File Sharing mit Netzwerkodierung auf basis von Elgamal Verschlüsselung
 
-# Peer to Peer:
+Peer to Peer:
     Es wird als erstes ein Server Node gestartet. Jede weitere Instaz verbindet sich zunächst mit dem 
     Server node und fragt nach einem zufälligen Node aus dem Netzwerk.
     Der Server Node speichert alle Vorhandenen Nodes.
@@ -11,7 +9,7 @@ Peer to Peer File Sharing mit Netzwerkodierung auf basis von Elgamal Verschlüss
 
     Eventuell erweitern auf IP adresse und testen auf unterscchiedlichen rechnern innerhalb eines Netzwerks (?)
 
-# File Sharing:
+File Sharing:
     Jeder Node kann eine File auswählen, welche er über das Netzwerk an alle anderen Versenden möchte.
     Die Datei wird in einzelne (gleichgroße) Packete unterteilt und diese in einer Liste zwischengespeichert.
     Danach werden die einzelnen Packete mit der Elgamal Verschlüsselung verschlüsselt und der Schlüssel für jedes Packet wird in einer weiteren Liste 
@@ -33,7 +31,7 @@ Peer to Peer File Sharing mit Netzwerkodierung auf basis von Elgamal Verschlüss
     (Was wenn ein Node das Netzwerk verlässt ??)
 
 
-# Netzwerkodierung:
+Netzwerkodierung:
     Die Datei wird in Packeten mit der Matrix versendet. Dadurch können Sie wieder hergestellt werden.
     Jeder Node, der ein Packet empfängt, sendet es automatisch an alle seine Nachbarn weiter.
 
