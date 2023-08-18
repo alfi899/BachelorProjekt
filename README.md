@@ -55,4 +55,5 @@ Peer to Peer File Sharing mit Netzwerkodierung auf basis von Elgamal Verschlüss
 # Probleme
     > Wenn das GUI window geschlossen wird, läuft das Programm im Hintergrund noch weiter
     > Wenn ein Node das Netzwerk verlässt, bekommen es noch nicht alle mit (Der Server Node auch nicht)
-    > Wenn der Server Node das Netzwerk verlässt, gibt es keinen neuen Server Node mit den aktuellen Nodes 
+    > Wenn der Server Node das Netzwerk verlässt, gibt es keinen neuen Server Node mit den aktuellen Nodes
+    > Nur eine Datei herunterladen, wenn diese auch vollständig ist
