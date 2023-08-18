@@ -88,11 +88,12 @@ class Peer:
             Always read the HEADERSIZE which indicates the length of a received 
             packet and read every packet for packet individually.
 
+            TODO: (?)
             Collect packets in a buffer array and send a linear combination of them to all other connected nodes
         """
         message = ""
         packet = "PACKET"
-        #packet_number = ""
+        disconnect = "disconnect"
         #total = ""
         try:
             print("[*] Conversation Ready")
@@ -125,27 +126,37 @@ class Peer:
 
                         for p in p2p.connections:
                             self.send_linear_combination_of_packets(p, message)
-                            
+
+                    # if node disconnected from the Network, tell it the other ones
+                    if disconnect in message:
+                        for p in p2p.connections:
+                            print(f"I am Here and neet to tell {p} that ?? has disconnected")        
                         #    msg = pickle.dumps(message)
                         #    msg = bytes(f"{len(msg):<{HEADERSIZE}}", 'utf-8')+msg
                         #    p.send(msg)
                         
         except KeyboardInterrupt:
+            print("[********] Disconnect")
             self.send_disconnect_to_Node()
+            self.send_disconnet_to_server()
             sys.exit()
         except ConnectionResetError:
             self.send_disconnect_to_Node()
+            self.send_disconnet_to_server()
             sys.exit()
         except OSError as e:
             pass
 
+    def tell_disconnection(self, conn, addr):
+        """ Tell the the connected nodes, that a Node has disconnected to the network """
+        pass
+
 
     def receive_messages(self, conn, a):
-        """ listen constantly for incomming messages 
-            (for first node)
-        """
+        """ listen constantly for incomming messages """
         message = ""
         packet = "PACKET"
+        disconnect = "disconnect"
         try:
             print("[*] Ready to receive messages")
             full_msg = b''
@@ -175,7 +186,14 @@ class Peer:
                         #Message.message = self.packet_buffer
                         Message.message.append(message)
                         print(f"[*] Packet recveived {packet_number} / {total}")
-                        # send linear combinations of packets to other Nodes
+                    
+                    # if node disconnected from the Network, tell it the other ones
+                    if disconnect in message:
+                        for p in p2p.connections:
+                            print(f"I am Here and neet to tell {p} that {conn} has disconnected")
+                            #self.tell_disconnection(conn, a)
+                    
+                    # send linear combinations of packets to other Nodes
                     for p in p2p.connections:
                         if p != conn:
                             self.send_linear_combination_of_packets(p, message)
@@ -185,9 +203,12 @@ class Peer:
                                 #p.send(msg)
         except ConnectionResetError:
             # The connected Peer disconnected himself
-            print("[*] Peer diconnected himself")
+            print("[***] Peer diconnected himself")
             self.disconnect(conn, a)
-            pass
+            #pass
+        except KeyboardInterrupt:
+            print("[*] Disconnect from the Network--")
+            sys.exit()
 
     def disconnect(self, conn, a):
         """ Disconnect from a Node """
@@ -196,9 +217,15 @@ class Peer:
             p2p.connections.remove(conn)
             self.peers.remove(a)
             p2p.peers.remove(a)
-            conn.close()
+            #conn.close()
             print(f"[*] Disconnected {a}")
         except ValueError:
+            print("[*] Tell neighbor nodes from disconnection")
+            #for p in p2p.connections:
+            #    m = f"disconnect {conn}"
+            #    msg = pickle.dumps(m)
+            #    msg = bytes(f"{len(msg):<{HEADERSIZE}}", 'utf-8')+msg
+            #    p.send(msg)
             pass
 
     
@@ -339,13 +366,18 @@ class Peer:
                             self.send_linear_combination_of_packets(p, message)
         except KeyboardInterrupt:
             self.send_disconnet_to_server()
+            print("[*] Disconnect from the Network")
             sys.exit()
         except ConnectionResetError:
-            self.send_disconnet_to_server()
-            sys.exit()
+            #self.send_disconnet_to_server()
+            print("[*] Connection Resetet by Server")
+            # become the server
+            #sys.exit()
         except OSError:
+            print("OSERROR")
             pass
         except ValueError:
+            print("VALUE Error")
             pass
 
     def send_disconnect_to_Node(self):

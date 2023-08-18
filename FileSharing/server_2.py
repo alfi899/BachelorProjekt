@@ -3,6 +3,10 @@ import threading
 import pickle
 import random
 import numpy as np
+import sys
+import time
+
+
 
 from helper_2 import ServerRunning, p2p, Message
 
@@ -34,6 +38,7 @@ class StartGenesisNode:
             self.peers.append(a)
             print(f"Got connection from {a}")
             #p2p.peer_list.append(a)
+            
     
     def is_pickle(self, data):
         try:
@@ -99,53 +104,15 @@ class StartGenesisNode:
                     elif disconnect in message:
                         self.disconnect_peer(c, a)
                         break
-            """while True:
-                data = c.recv(1024)
-                #print(f"#### {data}")
-                #for conn in self.connections:
-                # Check if we get a list with pickle structure
-                if self.is_pickle(data) == True:
-                    d = pickle.loads(data)
-                    matrix = np.array(d["matrix"])
-                    packet = d["encoded_packet"]
-                    c1 = d["c1"]
-                    key = d["key"]
-                    q = d["q"]
-                    print(f"matrix: {matrix}, packet: {packet}, c1: {c1}, key: {key}, q: {q}")
-                elif data and data.decode('utf-8') == "req":
-                    # Peers asks for some random peers
-                    # Remove the peer that just connected from the list
-                    # So that it not get's it's own address
-                    tmp = list(filter(lambda x: x != a, self.peers))
-                    #print(f"tmp: {tmp}")
-                    if len(tmp) == 0: # First Peer in to connect to the network, so no peers to share
-                        m1 = "FIRST"
-                        m = pickle.dumps(m1)
-                        m = bytes(f"{len(m):<{HEADERSIZE}}", 'utf-8')+m
-                        c.send(m) #conn.send(m)
-                    else:
-                        # Send one Random Peer
-                        # The Peer then connects to the list of that random peer
-                        r = random.choice(tmp)
-                        m1 = "RANDOM_PEER"+ "|" + str(r)
-                        m = pickle.dumps(m1)
-                        m = bytes(f"{len(m):<{HEADERSIZE}}", 'utf-8')+m
-                        c.send(m) #conn.send(m)
-                elif data and data.decode('utf-8') == "MYIP":
-                    # Tell the Peer his IP
-                    m1 = "YOURIP" + "|" + str(a)
-                    m = pickle.dumps(m1)
-                    m = bytes(f"{len(m):<{HEADERSIZE}}", 'utf-8')+m
-                    c.send(m) #conn.send(m)
-                elif data and data.decode('utf-8') == "disconnect":
-                    self.disconnect_peer(c, a)
-                    break"""
         except ConnectionResetError:
             self.disconnect(c, a)
         except OSError:
             self.disconnect_peer(c, a)
         except ValueError:
             pass
+        except KeyboardInterrupt:
+            print("[*] Disconnect from the Network")
+            sys.exit()
                     
     def disconnect_peer(self, c, a):
         """Disconnect a new node after it got a random Node from the network"""

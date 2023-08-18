@@ -46,6 +46,11 @@ class App2(customtkinter.CTk):
         self.new_filename = ""
         self.packet_number = ""
         self.total_packets = ""
+
+        self.flag = True
+
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
         
         def send_button_function():
             self.home_frame.grid_forget()
@@ -307,14 +312,24 @@ class App2(customtkinter.CTk):
         #self.receive_file_button = customtkinter.CTkButton(self.receive_frame, text="Get File", command=receive_message)
         #self.receive_file_button.grid(row=3, column=1, padx=180, pady=40)
 
+
         # Show IP and Connections
-        while True:
-            self.ip_label = customtkinter.CTkLabel(self.home_frame, text=self.ip, width=100, height=4)
-            self.ip_label.grid(row=3, column=1, padx=10, pady=10)
+        # Does not work with while loop
+        #while True:
+        #    self.ip_label = customtkinter.CTkLabel(self.home_frame, text=self.ip, width=100, height=4)
+        #    self.ip_label.grid(row=3, column=1, padx=10, pady=10)
 
-            self.connections_number = len(p2p.connections)
+        #    self.connections_number = len(p2p.connections)
+    def on_closing(self):
+        print("Destroy this shit")
+        self.flag = False
+        self.destroy()
 
 
+def foreground():
+    global app
+    app = App2()
+    app.mainloop()
 
 def background():
     print("[*] Connecting to the Network")
@@ -327,14 +342,15 @@ def background():
             if ServerRunning.isRunning == False:
                 StartGenesisNode()
     except KeyboardInterrupt:
+        print("Exit")
         sys.exit()
-
-def foreground():
-    app = App2()
-    app.mainloop()
 
 if __name__=="__main__":
     b = threading.Thread(name="background", target=background)
     f = threading.Thread(name="foreground", target=foreground)
-    b.start()
+    #b.daemon = True
     f.start()
+    b.start()
+
+    #atexit.register(stop_threads)
+    

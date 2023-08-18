@@ -16,6 +16,7 @@ class p2p:
     peer_list = ['127.0.0.1']
     peers = []
     connections = []
+    running = True
 
 
 class Message:
