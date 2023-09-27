@@ -1,4 +1,5 @@
 import json
+import random
 import os
 import pickle
 import sys
@@ -11,6 +12,7 @@ from CTkTable import *
 import numpy as np
 import itertools
 import socket
+import sympy
 
 from helper_2 import ServerRunning
 from server_2 import StartGenesisNode
@@ -42,12 +44,16 @@ class App2(customtkinter.CTk):
 
         self.filename = ""
         self.elgamal = Gamal()
+        #self.my_public_key = self.elgamal.h
         self.file_format = ""
         self.new_filename = ""
         self.packet_number = ""
         self.total_packets = ""
 
         self.flag = True
+
+        self.prime_number_q = 911
+        self.prime_number_p = 2*self.prime_number_q + 1
 
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -59,16 +65,21 @@ class App2(customtkinter.CTk):
             
 
         def receive_button_function():
-            self.home_frame.grid_forget()
-            self.receive_frame.grid(row=0, column=1, sticky="nsew")
-            print("Go to receive Frame")
-            while True:
-                show_received_message = customtkinter.CTkLabel(self.receive_frame, text=len(Message.message), width=100, height=4)
-                show_received_message.grid(row=4, column=1, padx=200, pady=50)
+            if Message.message_ready == True:
+                self.home_frame.grid_forget()
+                self.receive_frame.grid(row=0, column=1, sticky="nsew")
+                print("Go to receive Frame")
+                receive_file_button = customtkinter.CTkButton(self.receive_frame, text="Get File", command=receive_message)
+                receive_file_button.grid(row=3, column=1, padx=180, pady=40)
+            else:
+                print("[*] Not enough linear combinations to recover the file")
+            #while True:
+            #    show_received_message = customtkinter.CTkLabel(self.receive_frame, text=len(Message.message), width=100, height=4)
+            #    show_received_message.grid(row=4, column=1, padx=200, pady=50)
 
-                if len(Message.message) != 0:
-                    receive_file_button = customtkinter.CTkButton(self.receive_frame, text="Get File", command=receive_message)
-                    receive_file_button.grid(row=3, column=1, padx=180, pady=40)
+            #    if len(Message.message) != 0:
+            #        receive_file_button = customtkinter.CTkButton(self.receive_frame, text="Get File", command=receive_message)
+            #        receive_file_button.grid(row=3, column=1, padx=180, pady=40)
 
         def back_to_home_from_S():
             self.send_frame.grid_forget()
@@ -123,7 +134,7 @@ class App2(customtkinter.CTk):
             padded_packets = []
             for packet in packets:
                 if len(packet) < target_size:
-                    padding = bytes([0] * (target_size - len(packet)))
+                    padding = bytes([1] * (target_size - len(packet)))
                     padded_packet = packet + padding
                     padded_packets.append(padded_packet)
                 else:
@@ -134,7 +145,7 @@ class App2(customtkinter.CTk):
             unpadded_packets = []
             for packet in padded_packets:
                 # Remove Padding. Remove the Nullbytes at the end
-                unpadded_packet = packet.rstrip(b'\x00')
+                unpadded_packet = packet.rstrip(b'\x01')
                 unpadded_packets.append(unpadded_packet)
             return unpadded_packets
         
@@ -142,62 +153,70 @@ class App2(customtkinter.CTk):
             return b''.join(packets)
 
 
-        def random_matrix_over_GF(n, rows, cols):
-            random_matrix = np.random.randint(0, n, size=(rows, cols))
+        def compute_linear_combinations(packet_list):
+            """ Compute the linear combinations of the elcrypted elgamal packages.
+                (It only computes one linear combination)
 
-            gf_matrix = random_matrix % n
+                1. Take every element exp() from the message list
+                   [list1, list2, list3] => [list1^a, list2^b, list3^c], where a,b,c are in the exponents list
 
-            return gf_matrix
+                2. Compute the c1 linear combinations 
+                   c1_1^a * c1_2^b * c1_3^c * .. * c1_n*n 
+            
+                3. Compute the linear combination of the c2 list's. Like element-wise list multiplication, with the earlier 
+                   modified exponential list
+            """
+            exp_list = []
+            e = []
+            c1 = 1
+            p = self.elgamal.p
+            for i in range(0, len(packet_list)):
+                r = random.randint(2, 9) # random number
+                exponent_list = [sympy.Pow(x,r) % p  for x in packet_list[i][1]]
+                c1 *= sympy.Pow(packet_list[i][0],r) % p
+                c1 = c1 % p 
+                exp_list.append(exponent_list)
+                e.append(r)
+
+            res = exp_list[0]
+            for sublist in exp_list[1:]:
+                res = [(a * b) % p for a,b in zip(res, sublist)]
+            
+            return c1, res, e
+            
 
         def send_message():
             """send the packets to the connected peers.
                 1. split the file in equally sized packets
                 2. Encrypt every single packet with elgamal encryption
-                3. generate a random matrix
-                4. Encode every packet and send it over the network
+                3. create linear combinations of the enctypted values
+                    (c1,c2)^a * (c1,c2)^b * c1,c2)^c ...
+                4. Save the coefficients (a,b,c) in a matrix and send it with the packets
             """
-            packet_size = 128 #256 # target packet size
+            packet_size = 64 #128 #256 # target packet size
             packets = split_file_into_packets(self.filename, packet_size)
             padded_packets = pad_packets(packets, packet_size)
-            print(f"len(packets): {len(padded_packets)}")
-           
             
-            # encrypt the packets with elgamal
-            encrypted_packets_vector = []
-            c1_vector = []
+            """ Encrypt every package using elgamal """
+            encrypted_packets = []
             for i in range(0, len(padded_packets)):
-                c1, encrypted_packet = self.elgamal.encryption(padded_packets[i])
-                encrypted_packets_vector.append(encrypted_packet)
-                c1_vector.append(c1)
-                       
+                encrypted_packet = self.elgamal.encryption(padded_packets[i]) #(c1, 2)
+                encrypted_packets.append(encrypted_packet)
+            print(encrypted_packets)
+            lc = []
+            m = []
+            """ Generate the linear combinations """
+            #while True:
+            for i in range(0, len(encrypted_packets)):
+                c1,c2,x = compute_linear_combinations(encrypted_packets)
+                lc.append((c1,c2))
+                m.append(x)
 
-            ## generate random matrix over the field GF(5) (maybe change to bigger one later)
-            gf = 5
-            size = packet_size
-            matrix = random_matrix_over_GF(gf, size, size)
-            
-            ### Encode the encrypted packets
-            count = 0
-
-            self.total_packets = len(encrypted_packets_vector)
-            
-            for i in range(0, len(encrypted_packets_vector)):
-                encoded_packet = np.dot(matrix, encrypted_packets_vector[i])
-                self.packet_number = i
-                # send the packet for now to all peer's, but later maybe only to a random selected peers
-                # and send the c1 value for decryption later
-                # for now send the matrix with every packet for the decoding process
-                send_formated({"PACKET": i,"GESAMT": self.total_packets ,"FORMAT": self.file_format, 
-                               "matrix": matrix, "encoded_packet": encoded_packet, "c1": c1_vector[i], 
-                               "key": self.elgamal.key, "q": self.elgamal.q}, i, len(encrypted_packets_vector))
-                #send_formated({"PACKET": i, "matrix": "matrix", "encoded_packet": "encoded_packet", "c1": "c1_vector[i]", "key": "self.elgamal.key", "q": "self.elgamal.q"})
-                time.sleep(1)
-                count += 1
-            
-            if count == len(encrypted_packets_vector):
-                print("[*] Successfully send all packets")
-
-
+                #print(f"key: {self.elgamal.public_key}, q: {self.elgamal.q}")
+                """ Continously send linear combinations out
+                    (But for testing we only send each lc once)"""
+                send_formated({"PACKET": (c1,c2), "exponentes": x, "key": self.elgamal.private_key, "p": self.elgamal.p, "L": len(encrypted_packets), "format": self.file_format}, i, len(encrypted_packets))
+                time.sleep(0.1)
 
 
         def send_formated(message, number, total):
@@ -211,7 +230,7 @@ class App2(customtkinter.CTk):
                 for p in p2p.connections:
                     try:
                         p.send(serialized_message)
-                        print(f"[*] Sended packet successfully {number+1} / {total}")
+                        #print(f"[*] Sended packet successfully {number+1} / {total}")
                     except:
                         print(f"[*] Failed to send message")
 
@@ -222,62 +241,35 @@ class App2(customtkinter.CTk):
                 3. Use elgamal decryption to decrypt the packet back to it's original
                 4. Write the packets to a file and safe it 
             """
-            print(f"Message length: {len(Message.message)}")
-            #if len(Message.message) != 0:
-            #    show_received_message = customtkinter.CTkLabel(self.receive_frame, text="Message Received", width=100, height=4)
-            #    show_received_message.grid(row=4, column=1, padx=200, pady=50)
-            #else:
-            #    show_received_message = customtkinter.CTkLabel(self.receive_frame, text="No Messages", width=100, height=4)
-            #    show_received_message.grid(row=4, column=1, padx=200, pady=50)
-
-            decoded_packets_vector = []
-            decrypted_packets_vector = []
-            # Do this for every package that is received
-            for i in range(0, len(Message.message)):
-                message = Message.message[i]
-                packet_number = message["PACKET"]
-                file_format = message["FORMAT"]
-                matrix = np.array(message["matrix"])
-                packet = message["encoded_packet"]
-                c1 = message["c1"]
-                key = message["key"]
-                q = message["q"]
-                print(f"Packet: {packet_number}")
-                print(f"matrix: {matrix}")
-                print(f"packet: {packet}")
-                print(f"c1: {c1}")
-                print(f"key: {key}")
-                print(f"q: {q}")
-                
-                ## decode packet with inverse matrix multiplication
-                inverse_matrix = np.linalg.inv(matrix)
-                decoded_packet_tmp = np.dot(inverse_matrix, packet)
-                res = np.round(decoded_packet_tmp)
-                decoded_packet = res.astype(int).tolist()
-                decoded_packets_vector.append(decoded_packet)
-                
-                print(f"[*] Decoded Packet successfull with inverseve matrix multiplication")
-                
-                dec_packet = self.elgamal.decrypt(c1, decoded_packet, key, q)
-                decrypted_packets_vector.append(dec_packet)
-                
+            print(Message.message)
+            s = list(itertools.chain.from_iterable(Message.message))
+            s = [int(x) for x in s]
+            res = []
+            file = []
+            for i in range(0, len(s)):
+                res.append(int.to_bytes(s[i], 1, 'big'))
+            st = b''.join(res)
+            file.append(st)
+            """print(decrypted_packets_vector)
             s = list(itertools.chain.from_iterable(decrypted_packets_vector))
+            print(s)
             res = []
             for i in range(0, len(s)):
                 res.append(int.to_bytes(s[i], 1, 'big'))
             concatenated_string = b''.join(res)
             nl = []
-            nl.append(concatenated_string)
+            nl.append(concatenated_string)"""
 
-            unpadded_packets = unpad_packets(nl)
+            unpadded_packets = unpad_packets(file)
             reconstructed_data = join_packets(unpadded_packets)
-
-            new_file = "Received_file"+file_format
+            print(reconstructed_data)
+            new_file = "Received_file"+Message.format
             
             with open(new_file, "wb") as file:
                 file.write(reconstructed_data)
             
             print("[*] Data has successfull been written to the file")
+
 
            
 
@@ -322,8 +314,10 @@ class App2(customtkinter.CTk):
         #    self.connections_number = len(p2p.connections)
     def on_closing(self):
         print("Destroy this shit")
+        p2p.stop = True
         self.flag = False
         self.destroy()
+        #quit()
 
 
 def foreground():
@@ -343,7 +337,7 @@ def background():
                 StartGenesisNode()
     except KeyboardInterrupt:
         print("Exit")
-        sys.exit()
+        sys.exit("EEEXXIIIT")
 
 if __name__=="__main__":
     b = threading.Thread(name="background", target=background)

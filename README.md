@@ -16,31 +16,31 @@ Peer to Peer File Sharing mit Netzwerkodierung auf basis von Elgamal Verschlüss
     Die Datei wird in einzelne (gleichgroße) Packete unterteilt und diese in einer Liste zwischengespeichert.
     Danach werden die einzelnen Packete mit der Elgamal Verschlüsselung verschlüsselt und der Schlüssel für jedes Packet wird in einer weiteren Liste 
     zwischengespeichert.
-    Danach wird eine zufällige Matrix generiert (Momentan über GF(5)), diese Matrix hat die größe wie ein einzelnens Packet (size x size)
-    Nun wird jedes packet mit der Matrix multipliziert um das Kodierte Packet zu erlangen.
-    Dann wird jedes Packet einzeln an alle Nachbar Nodes versendet in dem Format:
+    
+    Combinationen werden erstellt, indem die einzelnen Packete mit jeweils zufälligen
+    Zahlen exponentiert und miteinander multipliziert werden.
 
-        {'PACKET': packet nummer, 'GESMAT': gesamt anzahl der packete, 'FORMAT': Dateiformat der zuversendeten Datei, 'Matrix': zufallsmatri
-        'encoded_packet': Das Kodierte Packet, 'public_key': Elgamal public_key}
+        (c1,c2)^a * (c1,c2)^b * ....
 
-    Wird eine solche Nachricht empfangen, wird diese in einer Liste zwischengespeichert, mit allen anderen Nachtichten.
-    Danach wird über diese Liste iteriert und jedes Element wird folgenden Schritten unterzogen:
-        1. Die Nachricht wird aufgeteilt in ihre einzelteile (PACKET, encoded_packet, public_key,...)
-        2. Das Packet (encoded_packet) wird mittels inverser Matrixmultiplication dekodiert
-        3. Das dekodierte Packet wird mittels Elgamal decryption und dem public_key wieder in das Uhrsprungspacket verwandelt
-        4. Alle packete werden nun wieder in einer Datei gespeichert und die Uhrsprüngliche Datei wird wieder hergestellt
+    Jede einzelne combination wird mit den exponenten versendet. Sobal ein Node genügend
+    combinationen und exponenten hat, kann dieser die Zahlen entschlüsseln und die 
+    Datei wider herstellen.
 
-    (Was wenn ein Node das Netzwerk verlässt ??)
+    Hierzu werden die empfangen Kombinationen durch ElGamal Entschlüsselt (x1,x2,..,xn), und diese mit der modularen inversen matrix der Exponenten multipliziert und exponentiert.
+
+        B = A^-1 % q          m1 = x1**B[0][0] * x2**B[0][1] * ... * xn**B[0][n]
+                              m2 = x1**B[1][0] * x2**B[1][1] * ... * xn**B[1][n]
+                                        .....         .....           .....
+                              mn = x1**B[n][0] * x2**B[n][1] * ... * xn**B[n][n]
+
+    Hierdurch werden die Uhrsprünglichen Nachrichten wieder berechnet und wir byte Werte 
+    davon werden wieder in eine neue Datei geschrieben.
 
 
 # Netzwerkodierung:
-    Die Datei wird in Packeten mit der Matrix versendet. Dadurch können Sie wieder hergestellt werden.
-    Jeder Node, der ein Packet empfängt, sendet es automatisch an alle seine Nachbarn weiter.
-    Alle Nodes in dem Netzwerk können die Datei herunterladen.
-
-    Theoretisch müsste hier eine lineare Kombination der Packete versendet werden, wenn zwei Packete von verschiedenen 
-    Nodes empfangen werden (?)
-
+    Ein Node sammelt und versendet solange Nachrichten, bis dieser genug kombinationen,
+    sowie eine ausreichende Matrix der Exponenten hat. 
+    Nur nodes wie diese sind in der Lage die entschlüsselten Nachrichten wieder zu berechnen.
 
 # Installation
     Clone das Repository:

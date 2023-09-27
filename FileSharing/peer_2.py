@@ -6,8 +6,12 @@ import pickle
 import ast
 import numpy as np
 import json
+import sympy
+import itertools
+import random
 
 from helper_2 import p2p, ServerRunning, Message
+from elgamal_encryption_2 import Gamal
 
 HEADERSIZE = 10
 
@@ -39,9 +43,15 @@ class Peer:
         self.connection_safe = False
 
         self.packet_buffer = []
+
+        self.elgamal = Gamal()
+
+        self.matrix = []
+
         
         
         self.get_myIP_from_genesis()
+        #self.tell_server_my_public_key()
         
 
 
@@ -76,6 +86,7 @@ class Peer:
                 self.bind = False
 
 
+
     def send_linear_combination_of_packets(self, connection, message):
         """ Send a linear combination of packets to all connected Nodes """
         msg = pickle.dumps(message)
@@ -83,13 +94,45 @@ class Peer:
         connection.send(msg)
 
 
+    def recalculate_result(self, lc, matrix, p):
+        dec = [self.elgamal.decryption(lc[i][0], lc[i][1], Message.key) for i in range(len(lc))]
+        
+        print("DEC: ", dec)
+        m = sympy.Matrix(matrix)
+        q = (p-1) // 2
+        matrix_inverse = m.inv_mod(q)
+        print("INVERSE Matrix: ", matrix_inverse)
+
+        X = self.calculate_results(dec, matrix_inverse, p)
+
+        return X
+    
+
+    def calculate_results(self, lc_list, B, p):
+        final_res = []
+
+        # Use np matrix, better for zugriff
+        mat = np.array(B)
+        for i in range(0, len(lc_list)):
+            res = []
+            for j in range(0, len(lc_list)):
+                r = [sympy.Pow(x, mat[i][j]) % p for x in lc_list[j]]
+                res.append(r)
+            t = res[0]
+            result = []
+            for sublist in res[1:]:
+                t = [(a * b) % p for a,b in zip(t, sublist)]
+            t = [p - x if x > 256 else x for x in t] # Sometimes the bigger values are represented
+            result.append(t)
+            result = list(itertools.chain.from_iterable(result))
+            final_res.append(result)
+        return final_res
+
+
     def conversation_between_Nodes(self):
         """ For the connection between the Nodes. 
             Always read the HEADERSIZE which indicates the length of a received 
             packet and read every packet for packet individually.
-
-            TODO: (?)
-            Collect packets in a buffer array and send a linear combination of them to all other connected nodes
         """
         message = ""
         packet = "PACKET"
@@ -112,29 +155,32 @@ class Peer:
                     full_msg = b''
 
                     if packet in message:
-                        #print(message)
-                        #Message.message.append(message)
-                        packet_number = message["PACKET"]
-                        total = message["GESAMT"]
-                        #if len(self.packet_buffer) < total:
-                            # Noch nicht alle Packete erhalten, um die Datei wieder herzustellen
-                            #self.packet_buffer.append(message)
-                        #else:
-                            #Message.message = self.packet_buffer
-                        Message.message.append(message)
-                        print(f"[*] Packet recveived {packet_number+1} / {total}")
-
-                        for p in p2p.connections:
-                            self.send_linear_combination_of_packets(p, message)
-
+                        print(message)
+                        self.matrix.append(message['exponentes'])
+                        self.packet_buffer.append(message['PACKET'])
+                        print(f"[*] Packets comming from {self.t.getpeername()}")
+                        Message.key = message['key']
+                        Message.p = message['p']
+                        Message.format = message['format']
+                        # send linear combinations to other peers
+                        serialized_message = pickle.dumps(message)
+                        serialized_message = bytes(f"{len(serialized_message):<{HEADERSIZE}}", 'utf-8')+serialized_message
+                        #for p in p2p.connections:
+                        #    p.send(serialized_message)
+                        lenght = message['L']
+                        ma = np.array(self.matrix)
+                        rank = np.linalg.matrix_rank(ma)
+                        q = (Message.p - 1) // 2
+                        if rank % q == lenght:
+                            # ready to decrypt the linear combinations
+                            print("LC_list", self.packet_buffer)
+                            Message.message = self.recalculate_result(self.packet_buffer, self.matrix, Message.p)
+                            Message.message_ready = True
+                            #self.packet_buffer = []
                     # if node disconnected from the Network, tell it the other ones
                     if disconnect in message:
                         for p in p2p.connections:
                             print(f"I am Here and neet to tell {p} that ?? has disconnected")        
-                        #    msg = pickle.dumps(message)
-                        #    msg = bytes(f"{len(msg):<{HEADERSIZE}}", 'utf-8')+msg
-                        #    p.send(msg)
-                        
         except KeyboardInterrupt:
             print("[********] Disconnect")
             self.send_disconnect_to_Node()
@@ -176,31 +222,33 @@ class Peer:
                     # Interpret the message
                     if packet in message:
                         #print("[*] Received Packet")
-                        total = message["GESAMT"]
-                        packet_number = message["PACKET"]
-                        #print(message)
-                        #if len(self.packet_buffer) < total:
-                            # Noch nicht alle Packete erhalten, um die Datei wieder herzustellen
-                         #   self.packet_buffer.append(message)
-                        #else:
-                        #Message.message = self.packet_buffer
-                        Message.message.append(message)
-                        print(f"[*] Packet recveived {packet_number} / {total}")
-                    
+                        print(message)
+                        self.matrix.append(message['exponentes'])
+                        self.packet_buffer.append(message['PACKET'])
+                        print(f"[*] Packets comming from {conn.getpeername()}")
+                        Message.key = message['key']
+                        Message.p = message['p']
+                        Message.format = message['format']
+                        # send linear combinations to other peers
+                        serialized_message = pickle.dumps(message)
+                        serialized_message = bytes(f"{len(serialized_message):<{HEADERSIZE}}", 'utf-8')+serialized_message
+                        #for p in p2p.connections:
+                        #    p.send(serialized_message)
+                        lenght = message['L']
+                        ma = np.array(self.matrix)
+                        rank = np.linalg.matrix_rank(ma)
+                        q = (Message.p - 1) // 2
+                        if rank % q == lenght:
+                            # ready to decrypt the linear combinations
+                            print("LC_list", self.packet_buffer)
+                            Message.message = self.recalculate_result(self.packet_buffer, self.matrix, Message.p)
+                            Message.message_ready = True
+                            #self.packet_buffer = []
                     # if node disconnected from the Network, tell it the other ones
-                    if disconnect in message:
+                    elif disconnect in message:
                         for p in p2p.connections:
                             print(f"I am Here and neet to tell {p} that {conn} has disconnected")
-                            #self.tell_disconnection(conn, a)
-                    
-                    # send linear combinations of packets to other Nodes
-                    for p in p2p.connections:
-                        if p != conn:
-                            self.send_linear_combination_of_packets(p, message)
-                                #print(f"#Need to send to {conn}")
-                                #msg = pickle.dumps(message)
-                                #msg = bytes(f"{len(msg):<{HEADERSIZE}}", 'utf-8')+msg
-                                #p.send(msg)
+                            
         except ConnectionResetError:
             # The connected Peer disconnected himself
             print("[***] Peer diconnected himself")
@@ -263,6 +311,19 @@ class Peer:
         msg = bytes(f"{len(msg):>{HEADERSIZE}}", 'utf-8')+msg
         self.s.send(msg)
         print("[*] Asked Server for random Peers")
+
+    def tell_server_my_public_key(self):
+        """ Tell the other Peer (if first Node => Server Node) my public key for 
+            encryption with elgamal
+        """
+        pk = self.elgamal.h # public key
+        q = self.elgamal.q
+        g = self.elgamal.g
+        m = {"public_key": pk, "q": q, "g": g}
+        msg = pickle.dumps(m)
+        msg = bytes(f"{len(msg):>{HEADERSIZE}}", 'utf-8')+msg
+        self.s.send(msg)
+        print("[*] Senden Public Key to Server")
         
 
     def bind_Peer(self):
@@ -304,6 +365,37 @@ class Peer:
             return True
         except (pickle.UnpicklingError, AttributeError, EOFError, ImportError,IndexError):
             return False
+    
+    def compute_linear_combinations(self, packet_list):
+            """ Compute the linear combinations of the elcrypted elgamal packages.
+                (It only computes one linear combination)
+
+                1. Take every element exp() from the message list
+                   [list1, list2, list3] => [list1^a, list2^b, list3^c], where a,b,c are in the exponents list
+
+                2. Compute the c1 linear combinations 
+                   c1_1^a * c1_2^b * c1_3^c * .. * c1_n*n 
+            
+                3. Compute the linear combination of the c2 list's. Like element-wise list multiplication, with the earlier 
+                   modified exponential list
+            """
+            exp_list = []
+            e = []
+            c1 = 1
+            p = self.elgamal.p
+            for i in range(0, len(packet_list)):
+                r = random.randint(2, 9) # random number
+                exponent_list = [sympy.Pow(x,r) % p  for x in packet_list[i][1]]
+                c1 *= sympy.Pow(packet_list[i][0],r) % p
+                c1 = c1 % p 
+                exp_list.append(exponent_list)
+                e.append(r)
+
+            res = exp_list[0]
+            for sublist in exp_list[1:]:
+                res = [(a * b) % p for a,b in zip(res, sublist)]
+            
+            return c1, res, e
         
     def initial_conversation_with_Server_Node(self):
         """ Handle the initial conversation between the Node and the Server.
@@ -361,9 +453,30 @@ class Peer:
                     elif packet in message:
                         # got some packets from other peers
                         #print(message)
-                        Message.message.append(message)
-                        for p in p2p.connections:
-                            self.send_linear_combination_of_packets(p, message)
+                        self.matrix.append(message['exponentes'])
+                        self.packet_buffer.append(message['PACKET'])
+                        print(f"Packets Comming from {self.s.getpeername()}") # Get the Address of the incomming packets (from where do they come)
+                        Message.key = message["key"]
+                        Message.p = message["p"]
+                        Message.format = message['format']
+                        # send linear combinations to other peers
+                        #c1, c2, x = self.compute_linear_combinations(self.packet_buffer)
+                        #lc_new = {"PACKET": (c1,c2), "exponentes": x, "key": self.elgamal.private_key, "p": self.elgamal.p, "L": len(self.packet_buffer), "format": Message.format}
+                        #serialized_message = pickle.dumps(lc_new)
+                        serialized_message = pickle.dumps(message)
+                        serialized_message = bytes(f"{len(serialized_message):<{HEADERSIZE}}", 'utf-8')+serialized_message
+                        #for p in p2p.connections:
+                        #    p.send(serialized_message)
+                        lenght = message['L']
+                        ma = np.array(self.matrix)
+                        rank = np.linalg.matrix_rank(ma)
+                        q = (Message.p - 1) // 2
+                        if rank % q == lenght:
+                            # ready to decrypt the linear combinations
+                            print("LC_list", self.packet_buffer)
+                            Message.message = self.recalculate_result(self.packet_buffer, self.matrix, Message.p)
+                            Message.message_ready = True
+                            #self.packet_buffer = []
         except KeyboardInterrupt:
             self.send_disconnet_to_server()
             print("[*] Disconnect from the Network")
@@ -376,8 +489,8 @@ class Peer:
         except OSError:
             print("OSERROR")
             pass
-        except ValueError:
-            print("VALUE Error")
+        except ValueError as e:
+            #print(e)
             pass
 
     def send_disconnect_to_Node(self):
