@@ -22,6 +22,8 @@ class Gamal:
                 n (int): the number to test
                 k (int): the number of tests to do
             return True if n is prime
+
+            Thanks to https://medium.com/@ntnprdhmm/how-to-generate-big-prime-numbers-miller-rabin-49e6e6af32fb
         """
         # Test if n is not even
         # But care, 2 is prime!
