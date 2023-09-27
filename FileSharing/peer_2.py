@@ -97,11 +97,11 @@ class Peer:
     def recalculate_result(self, lc, matrix, p):
         dec = [self.elgamal.decryption(lc[i][0], lc[i][1], Message.key) for i in range(len(lc))]
         
-        print("DEC: ", dec)
+        #print("DEC: ", dec)
         m = sympy.Matrix(matrix)
         q = (p-1) // 2
         matrix_inverse = m.inv_mod(q)
-        print("INVERSE Matrix: ", matrix_inverse)
+        #print("INVERSE Matrix: ", matrix_inverse)
 
         X = self.calculate_results(dec, matrix_inverse, p)
 
@@ -155,7 +155,7 @@ class Peer:
                     full_msg = b''
 
                     if packet in message:
-                        print(message)
+                       #print(message)
                         self.matrix.append(message['exponentes'])
                         self.packet_buffer.append(message['PACKET'])
                         print(f"[*] Packets comming from {self.t.getpeername()}")
@@ -165,17 +165,19 @@ class Peer:
                         # send linear combinations to other peers
                         serialized_message = pickle.dumps(message)
                         serialized_message = bytes(f"{len(serialized_message):<{HEADERSIZE}}", 'utf-8')+serialized_message
-                        #for p in p2p.connections:
-                        #    p.send(serialized_message)
+                        for p in p2p.connections:
+                            if p != self.t:
+                                p.send(serialized_message)
                         lenght = message['L']
                         ma = np.array(self.matrix)
                         rank = np.linalg.matrix_rank(ma)
                         q = (Message.p - 1) // 2
                         if rank % q == lenght:
                             # ready to decrypt the linear combinations
-                            print("LC_list", self.packet_buffer)
+                            #print("LC_list", self.packet_buffer)
                             Message.message = self.recalculate_result(self.packet_buffer, self.matrix, Message.p)
                             Message.message_ready = True
+                            print("[*] File Decrypted")
                             #self.packet_buffer = []
                     # if node disconnected from the Network, tell it the other ones
                     if disconnect in message:
@@ -222,7 +224,7 @@ class Peer:
                     # Interpret the message
                     if packet in message:
                         #print("[*] Received Packet")
-                        print(message)
+                        #print(message)
                         self.matrix.append(message['exponentes'])
                         self.packet_buffer.append(message['PACKET'])
                         print(f"[*] Packets comming from {conn.getpeername()}")
@@ -232,17 +234,19 @@ class Peer:
                         # send linear combinations to other peers
                         serialized_message = pickle.dumps(message)
                         serialized_message = bytes(f"{len(serialized_message):<{HEADERSIZE}}", 'utf-8')+serialized_message
-                        #for p in p2p.connections:
-                        #    p.send(serialized_message)
+                        for p in p2p.connections:
+                            if p != conn:
+                                p.send(serialized_message)
                         lenght = message['L']
                         ma = np.array(self.matrix)
                         rank = np.linalg.matrix_rank(ma)
                         q = (Message.p - 1) // 2
                         if rank % q == lenght:
                             # ready to decrypt the linear combinations
-                            print("LC_list", self.packet_buffer)
+                            #print("LC_list", self.packet_buffer)
                             Message.message = self.recalculate_result(self.packet_buffer, self.matrix, Message.p)
                             Message.message_ready = True
+                            print("[*] File Decrypted")
                             #self.packet_buffer = []
                     # if node disconnected from the Network, tell it the other ones
                     elif disconnect in message:
@@ -465,17 +469,19 @@ class Peer:
                         #serialized_message = pickle.dumps(lc_new)
                         serialized_message = pickle.dumps(message)
                         serialized_message = bytes(f"{len(serialized_message):<{HEADERSIZE}}", 'utf-8')+serialized_message
-                        #for p in p2p.connections:
-                        #    p.send(serialized_message)
+                        for p in p2p.connections:
+                            if p != self.s:
+                                p.send(serialized_message)
                         lenght = message['L']
                         ma = np.array(self.matrix)
                         rank = np.linalg.matrix_rank(ma)
                         q = (Message.p - 1) // 2
                         if rank % q == lenght:
                             # ready to decrypt the linear combinations
-                            print("LC_list", self.packet_buffer)
+                            #print("LC_list", self.packet_buffer)
                             Message.message = self.recalculate_result(self.packet_buffer, self.matrix, Message.p)
                             Message.message_ready = True
+                            print("[*] File Decrypted")
                             #self.packet_buffer = []
         except KeyboardInterrupt:
             self.send_disconnet_to_server()

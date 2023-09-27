@@ -202,7 +202,7 @@ class App2(customtkinter.CTk):
             for i in range(0, len(padded_packets)):
                 encrypted_packet = self.elgamal.encryption(padded_packets[i]) #(c1, 2)
                 encrypted_packets.append(encrypted_packet)
-            print(encrypted_packets)
+            #print(encrypted_packets)
             lc = []
             m = []
             """ Generate the linear combinations """
@@ -241,7 +241,7 @@ class App2(customtkinter.CTk):
                 3. Use elgamal decryption to decrypt the packet back to it's original
                 4. Write the packets to a file and safe it 
             """
-            print(Message.message)
+            #print(Message.message)
             s = list(itertools.chain.from_iterable(Message.message))
             s = [int(x) for x in s]
             res = []
@@ -250,19 +250,10 @@ class App2(customtkinter.CTk):
                 res.append(int.to_bytes(s[i], 1, 'big'))
             st = b''.join(res)
             file.append(st)
-            """print(decrypted_packets_vector)
-            s = list(itertools.chain.from_iterable(decrypted_packets_vector))
-            print(s)
-            res = []
-            for i in range(0, len(s)):
-                res.append(int.to_bytes(s[i], 1, 'big'))
-            concatenated_string = b''.join(res)
-            nl = []
-            nl.append(concatenated_string)"""
-
+    
             unpadded_packets = unpad_packets(file)
             reconstructed_data = join_packets(unpadded_packets)
-            print(reconstructed_data)
+            #print(reconstructed_data)
             new_file = "Received_file"+Message.format
             
             with open(new_file, "wb") as file:
@@ -305,15 +296,9 @@ class App2(customtkinter.CTk):
         #self.receive_file_button.grid(row=3, column=1, padx=180, pady=40)
 
 
-        # Show IP and Connections
-        # Does not work with while loop
-        #while True:
-        #    self.ip_label = customtkinter.CTkLabel(self.home_frame, text=self.ip, width=100, height=4)
-        #    self.ip_label.grid(row=3, column=1, padx=10, pady=10)
-
-        #    self.connections_number = len(p2p.connections)
+        
     def on_closing(self):
-        print("Destroy this shit")
+        print("Destroy GUI")
         p2p.stop = True
         self.flag = False
         self.destroy()
@@ -346,5 +331,4 @@ if __name__=="__main__":
     f.start()
     b.start()
 
-    #atexit.register(stop_threads)
     

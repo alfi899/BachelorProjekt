@@ -53,11 +53,11 @@ class StartGenesisNode:
     def recalculate_result(self, lc, matrix, p):
         dec = [self.elgamal.decryption(lc[i][0], lc[i][1], Message.key) for i in range(len(lc))]
         
-        print("DEC: ", dec)
+        #print("DEC: ", dec)
         m = sympy.Matrix(matrix)
         q = (p-1) // 2
         matrix_inverse = m.inv_mod(q)
-        print("INVERSE Matrix: ", matrix_inverse)
+        #print("INVERSE Matrix: ", matrix_inverse)
 
         X = self.calculate_results(dec, matrix_inverse, p)
 
@@ -143,7 +143,7 @@ class StartGenesisNode:
                         m = bytes(f"{len(m):<{HEADERSIZE}}", 'utf-8')+m
                         c.send(m) #conn.send(m)
                     elif packet in message:
-                        print(message)
+                        #print(message)
                         self.matrix.append(message['exponentes'])
                         self.packet_buffer.append(message['PACKET'])
                         print(f"[*] Packets comming from {c.getpeername()}")
@@ -161,9 +161,10 @@ class StartGenesisNode:
                         q = (Message.p - 1) // 2
                         if rank % q == lenght:
                             # ready to decrypt the linear combinations
-                            print("LC_list", self.packet_buffer)
+                            #print("LC_list", self.packet_buffer)
                             Message.message = self.recalculate_result(self.packet_buffer, self.matrix, Message.p)
                             Message.message_ready = True
+                            print("[*] File Decrypted")
                     elif public_key in message:
                         print(f"[*] Received public_key from {a}")
                         print(f"public_key: {message}")
